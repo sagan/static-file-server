@@ -39,6 +39,13 @@ func setupFlags() {
 	flag.BoolVar(&option.helpFlag, "h", false, "")
 	flag.BoolVar(&option.versionFlag, "version", false, "")
 	flag.BoolVar(&option.versionFlag, "v", false, "")
+
+	flag.BoolVar(&config.Get.Debug, "debug", false, "")
+	flag.IntVar(&config.Get.Port, "port", 8080, "")
+	flag.StringVar(&config.Get.Folder, "folder", ".", "")
+	flag.StringVar(&config.Get.NotFoundFile, "not-found-file", "", "")
+	flag.BoolVar(&config.Get.AllowIndex, "allow-index", true, "")
+	flag.BoolVar(&config.Get.ShowListing, "show-listing", true, "")
 }
 
 // Execute CLI arguments.

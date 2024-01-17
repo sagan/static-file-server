@@ -206,7 +206,7 @@ func TestBasicWithAndWithoutLogging(t *testing.T) {
 	}
 
 	for _, serveFile := range serveFileFuncs {
-		handler := Basic(serveFile, baseDir)
+		handler := Basic(serveFile, baseDir, "")
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				fullpath := "http://localhost/" + tc.path
@@ -259,7 +259,7 @@ func TestPrefix(t *testing.T) {
 	}
 
 	for _, serveFile := range serveFileFuncs {
-		handler := Prefix(serveFile, baseDir, prefix)
+		handler := Prefix(serveFile, baseDir, prefix, "")
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				fullpath := "http://localhost" + tc.path
@@ -308,7 +308,7 @@ func TestIgnoreIndex(t *testing.T) {
 	}
 
 	for _, serveFile := range serveFileFuncs {
-		handler := IgnoreIndex(Basic(serveFile, baseDir))
+		handler := IgnoreIndex(Basic(serveFile, baseDir, ""), "")
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				fullpath := "http://localhost/" + tc.path
@@ -358,7 +358,7 @@ func TestPreventListings(t *testing.T) {
 	}
 
 	for _, serveFile := range serveFileFuncs {
-		handler := PreventListings(Basic(serveFile, baseDir), baseDir, "")
+		handler := PreventListings(Basic(serveFile, baseDir, ""), baseDir, "", "")
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				fullpath := "http://localhost/" + tc.path
@@ -447,7 +447,7 @@ func TestAddAccessKey(t *testing.T) {
 	}
 
 	for _, serveFile := range serveFileFuncs {
-		handler := AddAccessKey(Basic(serveFile, baseDir), accessKey)
+		handler := AddAccessKey(Basic(serveFile, baseDir, ""), accessKey, "")
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				fullpath := fmt.Sprintf(
@@ -648,9 +648,9 @@ func TestAddCorsWildcardHeaders(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				var handler http.HandlerFunc
 				if tc.corsEnabled {
-					handler = AddCorsWildcardHeaders(Basic(serveFile, baseDir))
+					handler = AddCorsWildcardHeaders(Basic(serveFile, baseDir, ""))
 				} else {
-					handler = Basic(serveFile, baseDir)
+					handler = Basic(serveFile, baseDir, "")
 				}
 
 				fullpath := "http://localhost/" + tmpFileName

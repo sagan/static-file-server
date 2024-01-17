@@ -113,8 +113,14 @@ func WithLogging(serveFile FileServerFunc) FileServerFunc {
 }
 
 // Basic file handler servers files from the passed folder.
-func Basic(serveFile FileServerFunc, folder string) http.HandlerFunc {
+func Basic(serveFile FileServerFunc, folder string, notFoundFile string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if notFoundFile != "" {
+			if _, err := os.Stat(folder + r.URL.Path); os.IsNotExist(err) {
+				serveNotFoundFile(w, r, notFoundFile)
+				return
+			}
+		}
 		serveFile(w, r, folder+r.URL.Path)
 	}
 }
@@ -122,11 +128,17 @@ func Basic(serveFile FileServerFunc, folder string) http.HandlerFunc {
 // Prefix file handler is an alternative to Basic where a URL prefix is removed
 // prior to serving a file (http://my.machine/prefix/file.txt will serve
 // file.txt from the root of the folder being served (ignoring 'prefix')).
-func Prefix(serveFile FileServerFunc, folder, urlPrefix string) http.HandlerFunc {
+func Prefix(serveFile FileServerFunc, folder, urlPrefix string, notFoundFile string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasPrefix(r.URL.Path, urlPrefix) {
-			http.NotFound(w, r)
+			serveNotFoundFile(w, r, notFoundFile)
 			return
+		}
+		if notFoundFile != "" {
+			if _, err := os.Stat(folder + strings.TrimPrefix(r.URL.Path, urlPrefix)); os.IsNotExist(err) {
+				serveNotFoundFile(w, r, notFoundFile)
+				return
+			}
 		}
 		serveFile(w, r, folder+strings.TrimPrefix(r.URL.Path, urlPrefix))
 	}
@@ -134,14 +146,14 @@ func Prefix(serveFile FileServerFunc, folder, urlPrefix string) http.HandlerFunc
 
 // PreventListings returns a function that prevents listing of directories but
 // still allows index.html to be served.
-func PreventListings(serve http.HandlerFunc, folder string, urlPrefix string) http.HandlerFunc {
+func PreventListings(serve http.HandlerFunc, folder string, urlPrefix string, notFoundFile string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/") {
 			// If the directory does not contain an index.html file, then
 			// return 'NOT FOUND' to prevent listing of the directory.
 			stat, err := os.Stat(path.Join(folder, strings.TrimPrefix(r.URL.Path, urlPrefix), "index.html"))
 			if err != nil || (err == nil && !stat.Mode().IsRegular()) {
-				http.NotFound(w, r)
+				serveNotFoundFile(w, r, notFoundFile)
 				return
 			}
 		}
@@ -152,10 +164,10 @@ func PreventListings(serve http.HandlerFunc, folder string, urlPrefix string) ht
 // IgnoreIndex wraps an HTTP request. In the event of a folder root request,
 // this function will automatically return 'NOT FOUND' as opposed to default
 // behavior where the index file for that directory is retrieved.
-func IgnoreIndex(serve http.HandlerFunc) http.HandlerFunc {
+func IgnoreIndex(serve http.HandlerFunc, notFoundFile string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/") {
-			http.NotFound(w, r)
+			serveNotFoundFile(w, r, notFoundFile)
 			return
 		}
 		serve(w, r)
@@ -173,10 +185,18 @@ func AddCorsWildcardHeaders(serve http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+func AddNoCacheHeaders(serve http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Expires", "0")
+		serve(w, r)
+	}
+}
+
 // AddAccessKey provides Access Control through url parameters. The access key
 // is set by ACCESS_KEY. md5sum is computed by queried path + access key
 // (e.g. "/my/file" + ACCESS_KEY)
-func AddAccessKey(serve http.HandlerFunc, accessKey string) http.HandlerFunc {
+func AddAccessKey(serve http.HandlerFunc, accessKey string, notFoundFile string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get key or md5sum from this access.
 		keys, keyOk := r.URL.Query()["key"]
@@ -185,7 +205,7 @@ func AddAccessKey(serve http.HandlerFunc, accessKey string) http.HandlerFunc {
 			// In case a code is provided
 			codes, codeOk := r.URL.Query()["code"]
 			if !codeOk || len(codes[0]) < 1 {
-				http.NotFound(w, r)
+				serveNotFoundFile(w, r, notFoundFile)
 				return
 			}
 			code = strings.ToUpper(codes[0])
@@ -203,7 +223,7 @@ func AddAccessKey(serve http.HandlerFunc, accessKey string) http.HandlerFunc {
 
 		// Compare the two.
 		if code != localCode {
-			http.NotFound(w, r)
+			serveNotFoundFile(w, r, notFoundFile)
 			return
 		}
 		serve(w, r)
@@ -250,4 +270,31 @@ func validReferrer(s []string, e string) bool {
 		}
 	}
 	return false
+}
+
+func serveNotFoundFile(w http.ResponseWriter, r *http.Request, notFoundFile string) {
+	if notFoundFile == "" {
+		http.NotFound(w, r)
+		return
+	}
+	if strings.HasPrefix(notFoundFile, "http://") || strings.HasPrefix(notFoundFile, "https://") {
+		http.Redirect(w, r, notFoundFile, http.StatusFound)
+		return
+	}
+	if strings.Contains(notFoundFile, "..") {
+		http.Error(w, "invalid URL path", http.StatusBadRequest)
+		return
+	}
+	contents, err := os.ReadFile(notFoundFile)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	if strings.HasSuffix(notFoundFile, ".html") || strings.HasSuffix(notFoundFile, ".HTML") {
+		w.Header().Add("Content-Type", "text/html; charset=utf-8")
+	} else {
+		w.Header().Add("Content-Type", "text/plain; charset=utf-8")
+	}
+	w.WriteHeader(http.StatusNotFound)
+	w.Write(contents)
 }

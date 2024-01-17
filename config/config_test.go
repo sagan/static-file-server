@@ -81,7 +81,7 @@ func TestOverrideWithEnvvars(t *testing.T) {
 	testDebug := true
 	testFolder := "/my/directory"
 	testHost := "apets.life"
-	testPort := uint16(666)
+	testPort := 666
 	testAllowIndex := false
 	testShowListing := false
 	testTLSCert := "my.pem"
@@ -108,7 +108,7 @@ func TestOverrideWithEnvvars(t *testing.T) {
 			)
 		}
 	}
-	equalUint16 := func(t *testing.T, name, key string, expected, result uint16) {
+	equalInt := func(t *testing.T, name, key string, expected, result int) {
 		if expected != result {
 			t.Errorf(
 				"While checking %s for '%s' expected %d but got %d",
@@ -128,11 +128,7 @@ func TestOverrideWithEnvvars(t *testing.T) {
 	// Verify defaults.
 	setDefaults()
 	phase := "defaults"
-	equalBool(t, phase, debugKey, defaultDebug, Get.Debug)
-	equalStrings(t, phase, folderKey, defaultFolder, Get.Folder)
 	equalStrings(t, phase, hostKey, defaultHost, Get.Host)
-	equalUint16(t, phase, portKey, defaultPort, Get.Port)
-	equalBool(t, phase, showListingKey, defaultShowListing, Get.ShowListing)
 	equalStrings(t, phase, tlsCertKey, defaultTLSCert, Get.TLSCert)
 	equalStrings(t, phase, tlsKeyKey, defaultTLSKey, Get.TLSKey)
 	equalStrings(t, phase, urlPrefixKey, defaultURLPrefix, Get.URLPrefix)
@@ -145,7 +141,7 @@ func TestOverrideWithEnvvars(t *testing.T) {
 	equalBool(t, phase, debugKey, testDebug, Get.Debug)
 	equalStrings(t, phase, folderKey, testFolder, Get.Folder)
 	equalStrings(t, phase, hostKey, testHost, Get.Host)
-	equalUint16(t, phase, portKey, testPort, Get.Port)
+	equalInt(t, phase, portKey, testPort, Get.Port)
 	equalBool(t, phase, showListingKey, testShowListing, Get.ShowListing)
 	equalStrings(t, phase, tlsCertKey, testTLSCert, Get.TLSCert)
 	equalStrings(t, phase, tlsKeyKey, testTLSKey, Get.TLSKey)
@@ -357,22 +353,26 @@ func TestEnvAsUint16(t *testing.T) {
 	sv := "STRING_VALUE"
 	uv := "UNSET_VALUE"
 
-	fbr := uint16(666)   // Fallback result
-	ubr := uint16(65535) // Upper bounds result
-	lbr := uint16(0)     // Lower bounds result
+	const MaxUint = ^uint(0)
+	const MinUint = 0
+	const MaxInt = int(MaxUint >> 1)
+	const MinInt = -MaxInt - 1
+	fbr := 666    // Fallback result
+	ubr := MaxInt // Upper bounds result
+	lbr := MinInt // Lower bounds result
 
-	os.Setenv(ubv, "65535")
-	os.Setenv(lbv, "0")
-	os.Setenv(hv, "65536")
-	os.Setenv(lv, "-1")
+	os.Setenv(ubv, fmt.Sprint(ubr))
+	os.Setenv(lbv, fmt.Sprint(lbr))
+	os.Setenv(hv, fmt.Sprint(ubr)+"0")
+	os.Setenv(lv, fmt.Sprint(lbr)+"0")
 	os.Setenv(bv, "true")
 	os.Setenv(sv, "Cheese")
 
 	testCases := []struct {
 		name     string
 		key      string
-		fallback uint16
-		result   uint16
+		fallback int
+		result   int
 	}{
 		{"Upper bounds", ubv, fbr, ubr},
 		{"Lower bounds", lbv, fbr, lbr},
@@ -385,7 +385,7 @@ func TestEnvAsUint16(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := envAsUint16(tc.key, tc.fallback)
+			result := envAsInt(tc.key, tc.fallback)
 			if tc.result != result {
 				t.Errorf(
 					"For %s with a %d fallback expected %d but got %d",

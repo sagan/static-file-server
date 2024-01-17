@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/halverneus/static-file-server/config"
 	"github.com/halverneus/static-file-server/handle"
@@ -46,33 +47,41 @@ func handlerSelector() (handler http.HandlerFunc) {
 		)
 	}
 
+	notFoundFile := config.Get.NotFoundFile
+	if notFoundFile != "" && !strings.HasPrefix(notFoundFile, "http://") && !strings.HasPrefix(notFoundFile, "https://") {
+		notFoundFile = config.Get.Folder + "/" + strings.TrimPrefix(notFoundFile, "/")
+	}
 	// Choose and set the appropriate, optimized static file serving function.
 	if 0 == len(config.Get.URLPrefix) {
-		handler = handle.Basic(serveFileHandler, config.Get.Folder)
+		handler = handle.Basic(serveFileHandler, config.Get.Folder, notFoundFile)
 	} else {
 		handler = handle.Prefix(
 			serveFileHandler,
 			config.Get.Folder,
 			config.Get.URLPrefix,
+			notFoundFile,
 		)
 	}
 
 	// Determine whether index files should hidden.
 	if !config.Get.ShowListing {
 		if config.Get.AllowIndex {
-			handler = handle.PreventListings(handler, config.Get.Folder, config.Get.URLPrefix)
+			handler = handle.PreventListings(handler, config.Get.Folder, config.Get.URLPrefix, notFoundFile)
 		} else {
-			handler = handle.IgnoreIndex(handler)
+			handler = handle.IgnoreIndex(handler, notFoundFile)
 		}
 	}
 	// If configured, apply wildcard CORS support.
 	if config.Get.Cors {
 		handler = handle.AddCorsWildcardHeaders(handler)
 	}
+	if config.Get.Nocache {
+		handler = handle.AddNoCacheHeaders(handler)
+	}
 
 	// If configured, apply key code access control.
 	if "" != config.Get.AccessKey {
-		handler = handle.AddAccessKey(handler, config.Get.AccessKey)
+		handler = handle.AddAccessKey(handler, config.Get.AccessKey, notFoundFile)
 	}
 
 	return

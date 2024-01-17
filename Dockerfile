@@ -15,7 +15,7 @@ RUN go mod download
 COPY . .
 
 RUN go test -cover ./...
-RUN go build -a -tags netgo -installsuffix netgo -ldflags "-s -w -X github.com/halverneus/static-file-server/cli/version.version=${VERSION}" -o /serve /build/bin/serve
+RUN go build -a -tags netgo -installsuffix netgo -ldflags "-s -w -X github.com/halverneus/static-file-server/cli/version.version=${VERSION}" -o /serve .
 
 RUN adduser --system --no-create-home --uid 1000 --shell /usr/sbin/nologin static
 
@@ -28,6 +28,7 @@ EXPOSE 8080
 COPY --from=builder /serve /
 COPY --from=builder /etc/passwd /etc/passwd
 
+WORKDIR /app
 USER static
 ENTRYPOINT ["/serve"]
 CMD []

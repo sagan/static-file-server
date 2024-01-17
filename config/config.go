@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"strconv"
@@ -18,9 +17,11 @@ var (
 	Get struct {
 		Cors          bool     `yaml:"cors"`
 		Debug         bool     `yaml:"debug"`
+		Nocache       bool     `yaml:"nocache"`
 		Folder        string   `yaml:"folder"`
+		NotFoundFile  string   `yaml:"not-found-file"`
 		Host          string   `yaml:"host"`
-		Port          uint16   `yaml:"port"`
+		Port          int      `yaml:"port"`
 		AllowIndex    bool     `yaml:"allow-index"`
 		ShowListing   bool     `yaml:"show-listing"`
 		TLSCert       string   `yaml:"tls-cert"`
@@ -34,35 +35,32 @@ var (
 )
 
 const (
-	corsKey        = "CORS"
-	debugKey       = "DEBUG"
-	folderKey      = "FOLDER"
-	hostKey        = "HOST"
-	portKey        = "PORT"
-	referrersKey   = "REFERRERS"
-	allowIndexKey  = "ALLOW_INDEX"
-	showListingKey = "SHOW_LISTING"
-	tlsCertKey     = "TLS_CERT"
-	tlsKeyKey      = "TLS_KEY"
-	tlsMinVersKey  = "TLS_MIN_VERS"
-	urlPrefixKey   = "URL_PREFIX"
-	accessKeyKey   = "ACCESS_KEY"
+	corsKey         = "CORS"
+	debugKey        = "DEBUG"
+	nocacheKey      = "NOCACHE"
+	folderKey       = "FOLDER"
+	notFoundFileKey = "NOT_FOUND_FILE"
+	hostKey         = "HOST"
+	portKey         = "PORT"
+	referrersKey    = "REFERRERS"
+	allowIndexKey   = "ALLOW_INDEX"
+	showListingKey  = "SHOW_LISTING"
+	tlsCertKey      = "TLS_CERT"
+	tlsKeyKey       = "TLS_KEY"
+	tlsMinVersKey   = "TLS_MIN_VERS"
+	urlPrefixKey    = "URL_PREFIX"
+	accessKeyKey    = "ACCESS_KEY"
 )
 
 var (
-	defaultDebug       = false
-	defaultFolder      = "/web"
-	defaultHost        = ""
-	defaultPort        = uint16(8080)
-	defaultReferrers   = []string{}
-	defaultAllowIndex  = true
-	defaultShowListing = true
-	defaultTLSCert     = ""
-	defaultTLSKey      = ""
-	defaultTLSMinVers  = ""
-	defaultURLPrefix   = ""
-	defaultCors        = false
-	defaultAccessKey   = ""
+	defaultHost       = ""
+	defaultReferrers  = []string{}
+	defaultTLSCert    = ""
+	defaultTLSKey     = ""
+	defaultTLSMinVers = ""
+	defaultURLPrefix  = ""
+	defaultCors       = false
+	defaultAccessKey  = ""
 )
 
 func init() {
@@ -71,13 +69,8 @@ func init() {
 }
 
 func setDefaults() {
-	Get.Debug = defaultDebug
-	Get.Folder = defaultFolder
 	Get.Host = defaultHost
-	Get.Port = defaultPort
 	Get.Referrers = defaultReferrers
-	Get.AllowIndex = defaultAllowIndex
-	Get.ShowListing = defaultShowListing
 	Get.TLSCert = defaultTLSCert
 	Get.TLSKey = defaultTLSKey
 	Get.TLSMinVersStr = defaultTLSMinVers
@@ -96,7 +89,7 @@ func Load(filename string) (err error) {
 
 	// Read contents from configuration file.
 	var contents []byte
-	if contents, err = ioutil.ReadFile(filename); nil != err {
+	if contents, err = os.ReadFile(filename); nil != err {
 		return
 	}
 
@@ -125,9 +118,11 @@ func overrideWithEnvVars() {
 	// Assign envvars, if set.
 	Get.Cors = envAsBool(corsKey, Get.Cors)
 	Get.Debug = envAsBool(debugKey, Get.Debug)
+	Get.Nocache = envAsBool(nocacheKey, Get.Nocache)
 	Get.Folder = envAsStr(folderKey, Get.Folder)
+	Get.NotFoundFile = envAsStr(notFoundFileKey, Get.NotFoundFile)
 	Get.Host = envAsStr(hostKey, Get.Host)
-	Get.Port = envAsUint16(portKey, Get.Port)
+	Get.Port = envAsInt(portKey, Get.Port)
 	Get.AllowIndex = envAsBool(allowIndexKey, Get.AllowIndex)
 	Get.ShowListing = envAsBool(showListingKey, Get.ShowListing)
 	Get.TLSCert = envAsStr(tlsCertKey, Get.TLSCert)
@@ -220,8 +215,8 @@ func envAsStrSlice(key string, fallback []string) []string {
 	return fallback
 }
 
-// envAsUint16 returns the value of the environment variable as a uint16 if set.
-func envAsUint16(key string, fallback uint16) uint16 {
+// envAsInt returns the value of the environment variable as a uint16 if set.
+func envAsInt(key string, fallback int) int {
 	// Retrieve the string value of the environment variable. If not set,
 	// fallback is used.
 	valueStr := os.Getenv(key)
@@ -231,8 +226,8 @@ func envAsUint16(key string, fallback uint16) uint16 {
 
 	// Parse the string into a uint16.
 	base := 10
-	bitSize := 16
-	valueAsUint64, err := strconv.ParseUint(valueStr, base, bitSize)
+	bitSize := 64
+	valueAsInt, err := strconv.ParseInt(valueStr, base, bitSize)
 	if nil != err {
 		log.Printf(
 			"Invalid value for '%s': %v\nUsing fallback: %d",
@@ -240,7 +235,7 @@ func envAsUint16(key string, fallback uint16) uint16 {
 		)
 		return fallback
 	}
-	return uint16(valueAsUint64)
+	return int(valueAsInt)
 }
 
 // envAsBool returns the value for an environment variable or, if not set, a

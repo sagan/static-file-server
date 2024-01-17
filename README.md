@@ -44,6 +44,9 @@ SHOW_LISTING=true
 # Folder with the content to serve.
 FOLDER=/web
 
+# If not empty, will use this file (relative to FOLDER) as 404 page. E.g.: 404.html
+NOT_FOUND_PAGE=
+
 # URL path prefix. If 'my.file' is in the root of $FOLDER and $URL_PREFIX is
 # '/my/place' then file is retrieved with 'http://$HOST:$PORT/my/place/my.file'.
 URL_PREFIX=
